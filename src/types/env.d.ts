@@ -6,7 +6,7 @@ export type Intent = keyof typeof GatewayIntentBits;
  * Logging configuration for the bot.
  */
 export interface Logging {
-  /** Logging level. One of 'debug', 'info', 'warn', 'error'. */
+  /** Logging level. One of one of 'trace', 'debug', 'info', 'warning', 'error', 'fatal'. */
   level: "trace" | "debug" | "info" | "warning" | "error" | "fatal";
   /** Enable logging to a file. */
   enableFileLogging: boolean;
@@ -41,13 +41,13 @@ export interface FeatureOptions {
  */
 export interface Options {
   /** Array of Discord user IDs that have admin privileges. */
-  adminIds: string[];
+  adminIds?: string[];
   /** Logging configuration */
   logging: Logging;
   /** Array of database configurations */
-  db: DB[];
+  db?: DB[];
   /** Feature toggles */
-  feature: FeatureOptions;
+  feature?: FeatureOptions;
 }
 
 /**

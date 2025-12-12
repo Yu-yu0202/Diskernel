@@ -3,8 +3,17 @@
   "version": "0.1.0",
   "description": "",
   "type": "module",
-  "main": "dist/index.js",
-  "types": "src/types/index.d.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "imports": {
+    "#types": "./dist/types/index.js"
+  },
   "scripts": {
     "build": "tsc",
     "format": "prettier --write .",
@@ -14,21 +23,25 @@
   "author": "Yu-yu0202",
   "devDependencies": {
     "@eslint/js": "^9.39.1",
-    "@types/node": "^24.10.1",
-    "discord.js": "^14.25.0",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^25.0.0",
+    "discord.js": "^14.25.1",
     "eslint": "^9.39.1",
     "globals": "^16.5.0",
-    "prettier": "^3.6.2",
-    "ts-node": "^10.9.2",
+    "prettier": "^3.7.4",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.47.0"
+    "typescript-eslint": "^8.49.0"
   },
   "license": "AGPL-3.0-only",
-  "packageManager": "pnpm@10.22.0",
+  "packageManager": "pnpm@10.25.0",
   "dependencies": {
-    "@logtape/file": "^1.2.0",
-    "@logtape/logtape": "^1.2.0",
-    "dotenv": "^17.2.3",
-    "winston": "^3.18.3"
+    "@logtape/file": "^1.2.2",
+    "@logtape/logtape": "^1.2.2",
+    "better-sqlite3": "^12.5.0",
+    "mysql2": "^3.15.3",
+    "winston": "^3.19.0"
+  },
+  "peerDependencies": {
+    "discord.js": "^14.25.1"
   }
 }

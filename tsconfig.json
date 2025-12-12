@@ -9,12 +9,15 @@
     "skipLibCheck": true,
     "outDir": "dist",
     "rootDir": "src",
+    "declaration": true,
+    "declarationMap": true,
     "resolveJsonModule": true,
     "verbatimModuleSyntax": true,
     "allowImportingTsExtensions": false,
+    "isolatedModules": true,
     "baseUrl": ".",
     "paths": {
-      "#types": ["src/types/index.d.ts"]
+      "#types": ["src/types/internal.d.ts"]
     }
   },
   "include": ["src/**/*"],

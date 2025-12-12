@@ -1,18 +1,18 @@
 import { GatewayIntentBits } from "discord.js";
-
-import type { EnvConfigT, Intent } from "../types/env.d.ts";
+import { type ConfigT, type Intent, Config as config } from "#types";
+import { Log } from "./logger.js";
 
 class EnvConfigError extends Error {
-  constructor(message: string) {
-    super(message);
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
     this.name = "EnvConfigError";
   }
 }
 
-export class EnvConfig {
-  protected static instance: EnvConfigT;
+export class Config extends config {
+  protected static instance: ConfigT;
 
-  private validateConfig(config: EnvConfigT): void {
+  private static validateConfig(config: ConfigT): void {
     if (!config.TOKEN || typeof config.TOKEN !== "string") {
       throw new EnvConfigError("Invalid or missing TOKEN in configuration.");
     }
@@ -41,9 +41,14 @@ export class EnvConfig {
 
       if (config.options.logging) {
         if (
-          !["trace", "debug", "info", "warning", "error", "fatal"].includes(
-            config.options.logging.level,
-          )
+          ![
+            "trace",
+            "debug",
+            "info",
+            "warning",
+            "error",
+            "fatal",
+          ].includes(config.options.logging.level)
         ) {
           throw new EnvConfigError(
             "Logging level must be one of 'trace', 'debug', 'info', 'warning', 'error', 'fatal'.",
@@ -108,15 +113,31 @@ export class EnvConfig {
           );
         }
       }
+    } else {
+      throw new EnvConfigError("options field is required in configuration.");
     }
   }
 
-  constructor(config: EnvConfigT) {
-    this.validateConfig(config);
-    EnvConfig.instance = config;
+  constructor(config: ConfigT) {
+    super();
+    if (Config.instance) {
+      return;
+    }
+    Config.validateConfig(config);
+    Config.instance = config;
+    Log.initalizeMainLogger(config.options.logging);
   }
 
-  public static get<K extends keyof EnvConfigT>(key: K): EnvConfigT[K] {
-    return EnvConfig.instance[key];
+  public static get<K extends keyof ConfigT>(key: K): ConfigT[K] {
+    if (!Config.instance) {
+      throw new EnvConfigError(
+        "Config is not initialized!",
+      );
+    }
+    return Config.instance[key];
+  }
+
+  public static isInitialized(): boolean {
+    return Config.instance !== undefined;
   }
 }

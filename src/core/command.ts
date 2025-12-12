@@ -69,7 +69,7 @@ export class Command extends command {
         }
       })();
       if(commands) await this.registerWithGuildID(guild.id,commands);
-      Logger.info('✅ Register commands finished successfully.);
+      Logger.info('✅ Register commands finished successfully.');
     });
   }
 

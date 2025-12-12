@@ -57,6 +57,20 @@ export class Command extends command {
       )
         this.handleCommands(interaction);
     });
+    this.client?.on("guildCreate",async (guild) => {
+      Logger.info(`✅ Joined new guild(id: ${guild.id}, name: ${guild.name}). registering commands...`);
+      const commands = (() => {
+        try {
+          return this.buildCommands();
+        } catch (e: unknown) {
+          Logger.error(`❌️ Failed to build commands: ${(e as Error).message}`);
+          Logger.error(`Stack trace: ${(e as Error).stack}`);
+          return undefined;
+        }
+      })();
+      if(commands) await this.registerWithGuildID(guild.id,commands);
+      Logger.info('✅ Register commands finished successfully.);
+    });
   }
 
   private static async loadCommandFromDir(dir: string): Promise<boolean> {

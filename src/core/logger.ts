@@ -35,8 +35,7 @@ export class Log extends log {
       if (!options) {
         options = Config.get("options")?.logging ?? {
           level: "info",
-          enableFileLogging: false,
-          logFilePath: "./logs/bot.log",
+          enableFileLogging: false
         };
       }
       if (options.enableFileLogging) {

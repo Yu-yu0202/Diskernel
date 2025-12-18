@@ -2,11 +2,16 @@ import { GatewayIntentBits } from "discord.js";
 
 export type Intent = keyof typeof GatewayIntentBits;
 
-export interface Logging {
-  level: "trace" | "debug" | "info" | "warning" | "error" | "fatal";
-  enableFileLogging: boolean;
-  logFilePath: string;
-}
+export type Logging =
+  | {
+    level: "trace" | "debug" | "info" | "warning" | "error" | "fatal";
+    enableFileLogging: false;
+  }
+  | {
+    level: "trace" | "debug" | "info" | "warning" | "error" | "fatal";
+    enableFileLogging: true;
+    logFilePath: string;
+  }
 
 export type DB =
   | {

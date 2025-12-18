@@ -75,7 +75,7 @@ export class Command extends command {
 
   private static async loadCommandFromDir(dir: string): Promise<boolean> {
     try {
-      const files = await fs.promises.readdir(dir);
+      const files = await fs.promises.readdir(dir, { recursive: true });
       await Promise.all(
         files
           .filter((f) => f.endsWith(".js"))

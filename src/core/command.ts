@@ -57,7 +57,7 @@ export class Command extends command {
       )
         this.handleCommands(interaction);
     });
-    this.client?.on("guildCreate",async (guild) => {
+    this.client?.on("guildCreate", async (guild) => {
       Logger.info(`✅ Joined new guild(id: ${guild.id}, name: ${guild.name}). registering commands...`);
       const commands = (() => {
         try {
@@ -68,7 +68,7 @@ export class Command extends command {
           return undefined;
         }
       })();
-      if(commands) await this.registerWithGuildID(guild.id,commands);
+      if (commands) await this.registerWithGuildID(guild.id, commands);
       Logger.info('✅ Register commands finished successfully.');
     });
   }
@@ -632,6 +632,8 @@ export class Command extends command {
       return;
     }
 
+    const subCommandName = command.type === "slash" && interaction instanceof ChatInputCommandInteraction ? interaction.options.getSubcommand(false) : null;
+
     const isCommandTypeMatch =
       (command.type === "slash" &&
         interaction instanceof ChatInputCommandInteraction) ||
@@ -647,7 +649,7 @@ export class Command extends command {
 
     if (!this.isDevCheckPassed(interaction)) {
       Logger.debug(
-        `❌️ Command ${interaction.commandName} is dev only for ${interaction.user.id}(${interaction.user.globalName})`,
+        `❌️ Command ${subCommandName || interaction.commandName} is dev only for ${interaction.user.id}(${interaction.user.globalName})`,
       );
       await this.replyDevMessage(interaction);
       return;
@@ -655,29 +657,40 @@ export class Command extends command {
 
     if (!this.isPrivilegeCheckPassed(interaction)) {
       Logger.debug(
-        `❌️ Command ${interaction.commandName} is admin only for ${interaction.user.id}(${interaction.user.globalName})`,
+        `❌️ Command ${subCommandName || interaction.commandName} is admin only for ${interaction.user.id}(${interaction.user.globalName})`,
       );
       await this.replyPrivilegeMessage(interaction);
       return;
     }
 
-    if (!this.isCooldownPassed(command.name, interaction.user.id)) {
+    if (!this.isCooldownPassed(subCommandName || command.name, interaction.user.id)) {
       Logger.debug(
-        `❌️ Command ${interaction.commandName} is on cooldown for ${interaction.user.id}(${interaction.user.globalName})`,
+        `❌️ Command ${subCommandName || interaction.commandName} is on cooldown for ${interaction.user.id}(${interaction.user.globalName})`,
       );
       await this.replyCooldownMessage(interaction);
       return;
     }
 
     Logger.debug(
-      `✅️ Triggered command ${interaction.commandName} for ${interaction.user.id}(${interaction.user.globalName})`,
+      `✅️ Triggered command ${subCommandName || interaction.commandName} for ${interaction.user.id}(${interaction.user.globalName})`,
     );
 
     if (
       command.type === "slash" &&
       interaction instanceof ChatInputCommandInteraction
     ) {
+
+      if (subCommandName) {
+        const subCommand = this.commands.find(
+          (c) => c.name === subCommandName && c.parent === command.name,
+        );
+        if (subCommand && subCommand.type === "slash" && subCommand.execute) {
+          await subCommand.execute(interaction);
+          return;
+        }
+      }
       await command.execute(interaction);
+      return;
     } else if (
       command.type === "context" &&
       command.contextMenuType === "User" &&

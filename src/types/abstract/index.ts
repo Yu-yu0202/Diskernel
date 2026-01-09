@@ -1,4 +1,3 @@
-export * from "./database.abc.js";
 export * from "./command.abc.js";
 export * from "./client.abc.js";
 export * from "./config.abc.js";

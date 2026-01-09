@@ -4,9 +4,8 @@ import { Event } from "./core/event.js";
 import { Config } from "./core/config.js";
 import { ErrorHandler } from "./core/error.js";
 import { Log, Logger } from "./core/logger.js";
-import * as Database from './core/database/index.js';
 
-export { Core, Command, Event, Config, ErrorHandler, Log, Logger, Database };
-export const Diskernel = { Core, Command, Event, Config, ErrorHandler, Log, Logger, Database };
+export { Core, Command, Event, Config, ErrorHandler, Log, Logger };
+export const Diskernel = { Core, Command, Event, Config, ErrorHandler, Log, Logger };
 
 export * from "./types/index.js";

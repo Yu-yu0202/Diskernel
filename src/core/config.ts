@@ -70,37 +70,6 @@ export class Config extends config {
         }
       }
 
-      if (config.options.db) {
-        for (const dbConfig of config.options.db) {
-          if (!dbConfig.id || typeof dbConfig.id !== "string") {
-            throw new EnvConfigError(
-              "Each database configuration must have a valid string id.",
-            );
-          }
-
-          if (
-            dbConfig.type === "sqlite" &&
-            (!dbConfig.sqlite || typeof dbConfig.sqlite?.path !== "string")
-          ) {
-            throw new EnvConfigError(
-              `in ${dbConfig.id}: SQLite configuration must include a valid path.`,
-            );
-          } else if (dbConfig.type === "mysql") {
-            if (
-              !dbConfig.mysql ||
-              typeof dbConfig.mysql.host !== "string" ||
-              typeof dbConfig.mysql.user !== "string" ||
-              typeof dbConfig.mysql.password !== "string" ||
-              typeof dbConfig.mysql.database !== "string"
-            ) {
-              throw new EnvConfigError(
-                `in ${dbConfig.id}: MySQL configuration must include valid host, user, password, and database.`,
-              );
-            }
-          }
-        }
-      }
-
       if (config.options.feature) {
         if (
           typeof config.options.feature.enableCommandAutoload !== "boolean" ||

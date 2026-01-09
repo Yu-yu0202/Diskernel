@@ -1,37 +1,41 @@
-import path from "path";
 import fs from "fs";
+import path from "path";
 import {
+  type ApplicationCommandDataResolvable,
   ApplicationCommandType,
+  AutocompleteInteraction,
+  ButtonInteraction,
+  ChatInputCommandInteraction,
   Client,
   ContextMenuCommandBuilder,
-  SlashCommandBuilder,
-  SlashCommandSubcommandBuilder,
-  AutocompleteInteraction,
-  ChatInputCommandInteraction,
   ContextMenuCommandInteraction,
   EmbedBuilder,
-  type ApplicationCommandDataResolvable,
   type Guild,
-  UserContextMenuCommandInteraction,
-  MessageContextMenuCommandInteraction,
+  ModalSubmitInteraction,
+  SlashCommandBuilder,
+  SlashCommandSubcommandBuilder,
+  StringSelectMenuInteraction,
 } from "discord.js";
 import { Core } from "./client.js";
 import { Config } from "./config.js";
 import { getCustomCoreLogger } from "./logger.js";
 import {
-  type CommandT,
-  type OptionT,
+  type AnyActionT,
+  type AnyCommandT,
   type CooldownData,
+  type OptionT,
+  SlashCommandT,
   Command as command,
+  BaseAction,
+  BaseCommand
 } from "#types";
-
-type AnyCommandT = CommandT<"slash", undefined> | CommandT<"context", "User" | "Message">;
 
 const Logger = getCustomCoreLogger("commands");
 
 export class Command extends command {
   private static client?: Client;
-  private static commands: AnyCommandT[];
+  private static commands: AnyCommandT[] = [];
+  private static actions: Map<string, AnyActionT> = new Map<string, AnyActionT>();
   private static subCommands: {
     parent: string;
     command: SlashCommandSubcommandBuilder;
@@ -42,6 +46,7 @@ export class Command extends command {
   >();
 
   public static async initialize(): Promise<void> {
+    this.actions = new Map<string, AnyActionT>();
     this.commands = [];
     this.subCommands = [];
     this.cooldown = new Map<string, CooldownData>();
@@ -83,53 +88,86 @@ export class Command extends command {
             const filePath = path.join(dir, file);
             try {
               const module = await import(filePath);
-              let command: any = Object.values(module)[0];
+              const commandClass: unknown = Object.values(module)[0];
+              let command: AnyCommandT | AnyActionT | undefined;
 
-              if (command && typeof command === "function" && command.prototype) {
+              if (typeof commandClass === "function") {
                 try {
-                  command = new command() as AnyCommandT;
+                  const instance = new (commandClass as new () => AnyCommandT | AnyActionT)();
+                  command = instance;
                 } catch (_e) {
                   Logger.warn(`❌️ Failed to instantiate command class: ${file}`);
                   return;
                 }
+              } else {
+                Logger.warn(`❌️ Command class is not a constructor: ${file}`);
+                return;
               }
 
-              if (
-                !command ||
-                typeof command.name !== "string" ||
-                (command.type !== "slash" && command.type !== "context") ||
-                typeof command.execute !== "function"
-              ) {
+              if (!command) {
                 Logger.warn(`❌️ Invalid command: ${file}`);
                 return;
               }
 
-              command.isCooldownEnabled ??= false;
-              command.description ??= "No description provided.";
-
-              if (command.isAdminOnly) {
-                if (!Config.get("options")?.feature.enableAdminCommands) {
-                  Logger.warn(`❌️ Admin command is disabled: ${file}`);
-                  return;
-                }
-                if (!Config.get("options")?.adminIds) {
-                  Logger.warn(
-                    `❌️ Admin command is disabled due to no admin IDs in configuration: ${file}`,
-                  );
-                  return;
-                }
-              }
-              if (command.isDevOnly) {
+              if (command instanceof BaseCommand) {
                 if (
-                  !Config.get("options")?.feature.enableDevelopmentCommands
+                  typeof command !== "object" ||
+                  typeof (command as any).name !== "string" ||
+                  typeof (command as any).type !== "string" ||
+                  typeof (command as any).execute !== "function"
                 ) {
-                  Logger.warn(`❌️ Development command is disabled: ${file}`);
+                  Logger.warn(`❌️ Invalid command: ${file}`);
                   return;
                 }
-              }
 
-              this.commands.push(command);
-              Logger.debug(`✅️ Loaded command: ${file}`);
+                if (
+                  !command.isSlashCommand() &&
+                  !command.isContextMenuCommand()
+                ) {
+                  Logger.warn(`❌️ Invalid command type: ${file}`);
+                  return;
+                }
+
+                command.isCooldownEnabled ??= false;
+                command.description ??= "No description provided.";
+
+                if (command.isAdminOnly) {
+                  if (!Config.get("options")?.feature.enableAdminCommands) {
+                    Logger.warn(`❌️ Admin command is disabled: ${file}`);
+                    return;
+                  }
+                  if (!Config.get("options")?.adminIds) {
+                    Logger.warn(
+                      `❌️ Admin command is disabled due to no admin IDs in configuration: ${file}`,
+                    );
+                    return;
+                  }
+                }
+                if (command.isDevOnly) {
+                  if (
+                    !Config.get("options")?.feature.enableDevelopmentCommands
+                  ) {
+                    Logger.warn(`❌️ Development command is disabled: ${file}`);
+                    return;
+                  }
+                }
+
+                this.commands.push(command);
+                Logger.debug(`✅️ Loaded command: ${file}`);
+              } else if (command instanceof BaseAction) {
+                if (
+                  typeof command !== "object" ||
+                  typeof (command as any).name !== "string" ||
+                  typeof (command as any).type !== "string" ||
+                  typeof (command as any).execute !== "function"
+                ) {
+                  Logger.warn(`❌️ Invalid action: ${file}`);
+                  return;
+                }
+
+                this.actions.set(command.name, command);
+                Logger.debug(`✅️ Loaded action: ${file}`);
+              }
             } catch {
               Logger.warn(`❌️ Failed to import command: ${file}`);
             }
@@ -239,11 +277,11 @@ export class Command extends command {
           }
         }
         this.subCommands.push({ parent: command.parent, command: subCommand });
-      } else if (command.type === "context") {
+      } else if (command.type === "userContextMenu" || command.type === "messageContextMenu") {
         const contextMenuCommand = new ContextMenuCommandBuilder()
           .setName(command.name)
           .setType(
-            command.contextMenuType === "User"
+            command.type === "userContextMenu"
               ? ApplicationCommandType.User
               : ApplicationCommandType.Message,
           );
@@ -273,7 +311,7 @@ export class Command extends command {
     parent: string,
   ): boolean {
     const parentCommand = this.commands.find((c) => c.name === parent);
-    if (!parentCommand) return false;
+    if (!parentCommand || !parentCommand.hasParent()) return false;
 
     const command = this.commands.find(
       (c) => c.name === name && c.parent === parent,
@@ -282,8 +320,8 @@ export class Command extends command {
 
     const subCommand = new SlashCommandSubcommandBuilder()
       .setName(command.name)
-      .setDescription(command.description);
-    if (command.option) {
+      .setDescription(command.hasDescription() ? command.description : "No description provided.");
+    if (command.hasOptions()) {
       for (const option of command.option) {
         this.buildCommandOptions(option, subCommand);
       }
@@ -335,11 +373,11 @@ export class Command extends command {
         }
       }
       return slashCommand;
-    } else if (command.type === "context") {
+    } else if (command.type === "userContextMenu" || command.type === "messageContextMenu") {
       const contextMenuCommand = new ContextMenuCommandBuilder()
         .setName(command.name)
         .setType(
-          command.contextMenuType === "User"
+          command.type === "userContextMenu"
             ? ApplicationCommandType.User
             : ApplicationCommandType.Message,
         );
@@ -521,11 +559,22 @@ export class Command extends command {
   }
 
   private static isPrivilegeCheckPassed(
-    interaction: ChatInputCommandInteraction | ContextMenuCommandInteraction,
+    interaction:
+      | ChatInputCommandInteraction
+      | ContextMenuCommandInteraction
+      | ButtonInteraction
+      | StringSelectMenuInteraction
+      | ModalSubmitInteraction,
   ): boolean {
+    const interactionName = interaction instanceof ButtonInteraction ||
+      interaction instanceof StringSelectMenuInteraction ||
+      interaction instanceof ModalSubmitInteraction
+      ? interaction.customId
+      : interaction.commandName;
+
     const command = this.commands.find(
-      (c) => c.name === interaction.commandName,
-    );
+      (c) => c.name === interactionName,
+    ) || this.actions.get(interactionName);
     if (!command) return false;
 
     if (!command.isAdminOnly) return true;
@@ -538,11 +587,22 @@ export class Command extends command {
   }
 
   private static isDevCheckPassed(
-    interaction: ChatInputCommandInteraction | ContextMenuCommandInteraction,
+    interaction:
+      | ChatInputCommandInteraction
+      | ContextMenuCommandInteraction
+      | ButtonInteraction
+      | StringSelectMenuInteraction
+      | ModalSubmitInteraction,
   ): boolean {
+    const interactionName = interaction instanceof ButtonInteraction ||
+      interaction instanceof StringSelectMenuInteraction ||
+      interaction instanceof ModalSubmitInteraction
+      ? interaction.customId
+      : interaction.commandName;
+
     const command = this.commands.find(
-      (c) => c.name === interaction.commandName,
-    );
+      (c) => c.name === interactionName,
+    ) || this.actions.get(interactionName);
     if (!command) return false;
 
     if (!command.isDevOnly) return true;
@@ -555,8 +615,19 @@ export class Command extends command {
   }
 
   private static async replyCooldownMessage(
-    interaction: ChatInputCommandInteraction | ContextMenuCommandInteraction,
+    interaction:
+      | ChatInputCommandInteraction
+      | ContextMenuCommandInteraction
+      | ButtonInteraction
+      | StringSelectMenuInteraction
+      | ModalSubmitInteraction,
   ): Promise<void> {
+    const interactionName = interaction instanceof ButtonInteraction ||
+      interaction instanceof StringSelectMenuInteraction ||
+      interaction instanceof ModalSubmitInteraction
+      ? interaction.customId
+      : interaction.commandName;
+
     const embed = new EmbedBuilder()
       .setTitle("⏳️ レート制限")
       .setDescription(
@@ -565,30 +636,52 @@ export class Command extends command {
       .setColor("Red");
     await interaction.reply({ embeds: [embed], ephemeral: true }).catch((e) => {
       Logger.warn(
-        `❌️ Failed to reply to ${interaction.commandName} cooldown message. Error: ${e.message}`,
+        `❌️ Failed to reply to ${interactionName} cooldown message. Error: ${e.message}`,
       );
     });
     return;
   }
 
   private static async replyPrivilegeMessage(
-    interaction: ChatInputCommandInteraction | ContextMenuCommandInteraction,
+    interaction:
+      | ChatInputCommandInteraction
+      | ContextMenuCommandInteraction
+      | ButtonInteraction
+      | StringSelectMenuInteraction
+      | ModalSubmitInteraction,
   ): Promise<void> {
+    const interactionName = interaction instanceof ButtonInteraction ||
+      interaction instanceof StringSelectMenuInteraction ||
+      interaction instanceof ModalSubmitInteraction
+      ? interaction.customId
+      : interaction.commandName;
+
     const embed = new EmbedBuilder()
       .setTitle("❌️ 管理者権限が必要です")
       .setDescription("このコマンドは管理者権限が必要です。")
       .setColor("Red");
     await interaction.reply({ embeds: [embed], ephemeral: true }).catch((e) => {
       Logger.warn(
-        `❌️ Failed to reply to ${interaction.commandName} privilege message. Error: ${e.message}`,
+        `❌️ Failed to reply to ${interactionName} privilege message. Error: ${e.message}`,
       );
     });
     return;
   }
 
   private static async replyDevMessage(
-    interaction: ChatInputCommandInteraction | ContextMenuCommandInteraction,
+    interaction:
+      | ChatInputCommandInteraction
+      | ContextMenuCommandInteraction
+      | ButtonInteraction
+      | StringSelectMenuInteraction
+      | ModalSubmitInteraction,
   ): Promise<void> {
+    const interactionName = interaction instanceof ButtonInteraction ||
+      interaction instanceof StringSelectMenuInteraction ||
+      interaction instanceof ModalSubmitInteraction
+      ? interaction.customId
+      : interaction.commandName;
+
     const embed = new EmbedBuilder()
       .setTitle("❌️ 管理者権限が必要です")
       .setDescription(
@@ -597,7 +690,7 @@ export class Command extends command {
       .setColor("Red");
     await interaction.reply({ embeds: [embed], ephemeral: true }).catch((e) => {
       Logger.warn(
-        `❌️ Failed to reply to ${interaction.commandName} dev message. Error: ${e.message}`,
+        `❌️ Failed to reply to ${interactionName} dev message. Error: ${e.message}`,
       );
     });
     return;
@@ -607,23 +700,32 @@ export class Command extends command {
     interaction:
       | ChatInputCommandInteraction
       | ContextMenuCommandInteraction
+      | ButtonInteraction
+      | StringSelectMenuInteraction
+      | ModalSubmitInteraction
       | AutocompleteInteraction,
   ): Promise<void> {
+    const interactionName = interaction instanceof ButtonInteraction ||
+      interaction instanceof StringSelectMenuInteraction ||
+      interaction instanceof ModalSubmitInteraction
+      ? interaction.customId
+      : interaction.commandName;
+
     Logger.debug(
-      `Triggered command-interaction: ${interaction.commandName} for ${interaction.user.id}(${interaction.user.globalName})`,
+      `Triggered command-interaction: ${interactionName} for ${interaction.user.id}(${interaction.user.globalName})`,
     );
     const command = this.commands.find(
-      (c) => c.name === interaction.commandName,
-    );
+      (c) => c.name === interactionName,
+    ) || this.actions.get(interactionName) || undefined;
     if (!command) {
       Logger.debug(
-        `❌️ Command with name ${interaction.commandName} not found.`,
+        `❌️ Command with name ${interactionName} not found.`,
       );
       return;
     }
 
     if (interaction instanceof AutocompleteInteraction) {
-      if (command.autocomplete) {
+      if (command instanceof SlashCommandT && command.autocomplete) {
         Logger.debug(
           `✅️ Triggered autocomplete for ${interaction.commandName}`,
         );
@@ -634,22 +736,18 @@ export class Command extends command {
 
     const subCommandName = command.type === "slash" && interaction instanceof ChatInputCommandInteraction ? interaction.options.getSubcommand(false) : null;
 
-    const isCommandTypeMatch =
-      (command.type === "slash" &&
-        interaction instanceof ChatInputCommandInteraction) ||
-      (command.type === "context" &&
-        interaction instanceof ContextMenuCommandInteraction);
+    const isCommandTypeMatch = command.isSlashCommand() || command.isContextMenuCommand() || command.isButtonAction() || command.isSelectMenuAction() || command.isModalAction();
 
     if (!isCommandTypeMatch) {
       Logger.debug(
-        `❌️ Command ${interaction.commandName} is not a ${command.type} command`,
+        `❌️ Command ${interactionName} is not a ${command.type} command`,
       );
       return;
     }
 
     if (!this.isDevCheckPassed(interaction)) {
       Logger.debug(
-        `❌️ Command ${subCommandName || interaction.commandName} is dev only for ${interaction.user.id}(${interaction.user.globalName})`,
+        `❌️ Command ${subCommandName || interactionName} is dev only for ${interaction.user.id}(${interaction.user.globalName})`,
       );
       await this.replyDevMessage(interaction);
       return;
@@ -657,7 +755,7 @@ export class Command extends command {
 
     if (!this.isPrivilegeCheckPassed(interaction)) {
       Logger.debug(
-        `❌️ Command ${subCommandName || interaction.commandName} is admin only for ${interaction.user.id}(${interaction.user.globalName})`,
+        `❌️ Command ${subCommandName || interactionName} is admin only for ${interaction.user.id}(${interaction.user.globalName})`,
       );
       await this.replyPrivilegeMessage(interaction);
       return;
@@ -665,21 +763,19 @@ export class Command extends command {
 
     if (!this.isCooldownPassed(subCommandName || command.name, interaction.user.id)) {
       Logger.debug(
-        `❌️ Command ${subCommandName || interaction.commandName} is on cooldown for ${interaction.user.id}(${interaction.user.globalName})`,
+        `❌️ Command ${subCommandName || interactionName} is on cooldown for ${interaction.user.id}(${interaction.user.globalName})`,
       );
       await this.replyCooldownMessage(interaction);
       return;
     }
 
     Logger.debug(
-      `✅️ Triggered command ${subCommandName || interaction.commandName} for ${interaction.user.id}(${interaction.user.globalName})`,
+      `✅️ Triggered command ${subCommandName || interactionName} for ${interaction.user.id}(${interaction.user.globalName})`,
     );
 
     if (
-      command.type === "slash" &&
-      interaction instanceof ChatInputCommandInteraction
+      command.isSlashCommand() && interaction.isChatInputCommand()
     ) {
-
       if (subCommandName) {
         const subCommand = this.commands.find(
           (c) => c.name === subCommandName && c.parent === command.name,
@@ -692,15 +788,25 @@ export class Command extends command {
       await command.execute(interaction);
       return;
     } else if (
-      command.type === "context" &&
-      command.contextMenuType === "User" &&
-      interaction instanceof UserContextMenuCommandInteraction
+      command.isUserContextCommand() &&
+      interaction.isUserContextMenuCommand()
     ) {
       await command.execute(interaction);
     } else if (
-      command.type === "context" &&
-      command.contextMenuType === "Message" &&
-      interaction instanceof MessageContextMenuCommandInteraction
+      command.isMessageContextCommand() &&
+      interaction.isMessageContextMenuCommand()
+    ) {
+      await command.execute(interaction);
+    } else if (
+      command.isButtonAction() && interaction.isButton()
+    ) {
+      await command.execute(interaction);
+    } else if (
+      command.isSelectMenuAction() && interaction.isStringSelectMenu()
+    ) {
+      await command.execute(interaction);
+    } else if (
+      command.isModalAction() && interaction.isModalSubmit()
     ) {
       await command.execute(interaction);
     }

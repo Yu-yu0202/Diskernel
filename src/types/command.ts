@@ -28,6 +28,7 @@ export interface OptionT {
 export abstract class BaseInteraction<T extends InteractionKind> {
     readonly type: T;
 
+    public abstract global: boolean;
     public abstract isAdminOnly?: boolean;
     public abstract isDevOnly?: boolean;
     public abstract isCooldownEnabled?: boolean;

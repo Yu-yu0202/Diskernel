@@ -39,6 +39,7 @@ export class Command extends command {
   private static subCommands: {
     parent: string;
     command: SlashCommandSubcommandBuilder;
+    isGlobal: boolean;
   }[] = [];
   private static cooldown: Map<string, CooldownData> = new Map<
     string,
@@ -73,7 +74,7 @@ export class Command extends command {
           return undefined;
         }
       })();
-      if (commands) await this.registerWithGuildID(guild.id, commands);
+      if (commands) await this.registerWithGuildID(guild.id, commands.guild);
       Logger.info('✅ Register commands finished successfully.');
     });
   }
@@ -252,9 +253,10 @@ export class Command extends command {
     return undefined;
   }
 
-  private static buildCommands(): ApplicationCommandDataResolvable[] {
+  private static buildCommands(): { guild: ApplicationCommandDataResolvable[], global: ApplicationCommandDataResolvable[] } {
     type _commands = SlashCommandBuilder | ContextMenuCommandBuilder;
     const commands: _commands[] = [];
+    const globalCommands: _commands[] = [];
 
     for (const command of this.commands) {
       if (command.type === "slash" && !command.parent) {
@@ -266,7 +268,11 @@ export class Command extends command {
             this.buildCommandOptions(option, slashCommand);
           }
         }
-        commands.push(slashCommand);
+        if (command.global) {
+          globalCommands.push(slashCommand);
+        } else {
+          commands.push(slashCommand);
+        }
       } else if (command.type === "slash" && command.parent) {
         const subCommand = new SlashCommandSubcommandBuilder()
           .setName(command.name)
@@ -276,7 +282,7 @@ export class Command extends command {
             this.buildCommandOptions(option, subCommand);
           }
         }
-        this.subCommands.push({ parent: command.parent, command: subCommand });
+        this.subCommands.push({ parent: command.parent, command: subCommand, isGlobal: command.global });
       } else if (command.type === "userContextMenu" || command.type === "messageContextMenu") {
         const contextMenuCommand = new ContextMenuCommandBuilder()
           .setName(command.name)
@@ -285,7 +291,11 @@ export class Command extends command {
               ? ApplicationCommandType.User
               : ApplicationCommandType.Message,
           );
-        commands.push(contextMenuCommand);
+        if (command.global) {
+          globalCommands.push(contextMenuCommand);
+        } else {
+          commands.push(contextMenuCommand);
+        }
       }
       if (command.isCooldownEnabled) {
         this.initializeCooldown(
@@ -294,95 +304,17 @@ export class Command extends command {
           command.userCooldownTime,
         );
       }
-      this.subCommands.forEach((v) => {
-        const slashCommand = commands.find((c) => c.name === v.parent);
-        if (slashCommand instanceof SlashCommandBuilder) {
-          slashCommand.addSubcommand(v.command);
-        }
-      });
     }
-    return commands.map((c) => {
-      return c.toJSON();
+    this.subCommands.forEach((v) => {
+      const slashCommand = commands.find((c) => c.name === v.parent) ?? globalCommands.find(c => c.name === v.parent) ?? undefined;
+      if (slashCommand instanceof SlashCommandBuilder) {
+        slashCommand.addSubcommand(v.command);
+      }
     });
-  }
-
-  private static buildSubCommandFromNameAndParent(
-    name: string,
-    parent: string,
-  ): boolean {
-    const parentCommand = this.commands.find((c) => c.name === parent);
-    if (!parentCommand || !parentCommand.hasParent()) return false;
-
-    const command = this.commands.find(
-      (c) => c.name === name && c.parent === parent,
-    );
-    if (!command) return false;
-
-    const subCommand = new SlashCommandSubcommandBuilder()
-      .setName(command.name)
-      .setDescription(command.hasDescription() ? command.description : "No description provided.");
-    if (command.hasOptions()) {
-      for (const option of command.option) {
-        this.buildCommandOptions(option, subCommand);
-      }
-    }
-    if (command.isCooldownEnabled) {
-      this.initializeCooldown(
-        command.name,
-        command.globalCooldownTime,
-        command.userCooldownTime,
-      );
-    }
-    this.subCommands.push({ parent: command.parent!, command: subCommand });
-
-    return true;
-  }
-
-  private static buildCommandFromName(
-    name: string,
-  ): SlashCommandBuilder | ContextMenuCommandBuilder | undefined {
-    const command = this.commands.find((c) => c.name === name);
-    if (!command) return undefined;
-
-    if (command.isCooldownEnabled) {
-      this.initializeCooldown(
-        command.name,
-        command.globalCooldownTime,
-        command.userCooldownTime,
-      );
-    }
-    if (command.parent && command.type === "slash") {
-      const parent = this.buildCommandFromName(command.parent);
-      if (!(parent instanceof SlashCommandBuilder)) return undefined;
-
-      if (this.buildSubCommandFromNameAndParent(name, parent.name)) {
-        this.subCommands
-          .filter((c) => c.parent === parent.name)
-          .forEach((c) => {
-            parent.addSubcommand(c.command);
-          });
-        return parent;
-      } else return undefined;
-    } else if (command.type === "slash") {
-      const slashCommand = new SlashCommandBuilder()
-        .setName(command.name)
-        .setDescription(command.description);
-      if (command.option) {
-        for (const option of command.option) {
-          this.buildCommandOptions(option, slashCommand);
-        }
-      }
-      return slashCommand;
-    } else if (command.type === "userContextMenu" || command.type === "messageContextMenu") {
-      const contextMenuCommand = new ContextMenuCommandBuilder()
-        .setName(command.name)
-        .setType(
-          command.type === "userContextMenu"
-            ? ApplicationCommandType.User
-            : ApplicationCommandType.Message,
-        );
-      return contextMenuCommand;
-    }
+    return {
+      guild: commands.map((c) => c.toJSON()),
+      global: globalCommands.map(c => c.toJSON())
+    };
   }
 
   private static async registerWithGuildID(
@@ -403,92 +335,6 @@ export class Command extends command {
     Logger.debug(
       `✅ Registered ${commands.length} commands for guild ${guildID}.`,
     );
-    return true;
-  }
-
-  public static async unregisterFromName(name: string): Promise<boolean> {
-    const command = (await this.client!.application?.commands.fetch())?.find(
-      (c) => c.name === name,
-    );
-    if (!command) {
-      Logger.warn(`⚠ Command with name ${name} not found.`);
-      return false;
-    }
-
-    const guilds = this.client!.guilds.cache.values();
-    for (const guild of guilds) {
-      await guild.commands.delete(command);
-      if (guilds.toArray().length < 10) {
-        setTimeout(() => { }, 1000);
-      }
-    }
-
-    return true;
-  }
-
-  public static async unregisterFromNameAndGuildID(
-    name: string,
-    guildID: string,
-  ): Promise<boolean> {
-    const Command = (
-      await this.client!.guilds.cache.get(guildID)?.commands.fetch()
-    )?.find((c) => c.name === name);
-    if (!Command) {
-      Logger.warn(`⚠ Command with name ${name} not found in guild ${guildID}.`);
-      return false;
-    }
-
-    await this.client!.guilds.cache.get(guildID)?.commands.delete(Command);
-    return true;
-  }
-
-  public static async registerFromName(name: string): Promise<boolean> {
-    const commands = await this.client!.application?.commands.fetch();
-    if (commands?.find((c) => c.name === name)) {
-      Logger.warn(`⚠ Command with name ${name} already exists.`);
-      return false;
-    }
-    const command = this.buildCommandFromName(name)?.toJSON();
-    if (!command) {
-      Logger.warn(`⚠ Command with name ${name} is invalid.`);
-      return false;
-    }
-    const guilds = this.client!.guilds.cache.values();
-    for (const guild of guilds) {
-      await guild.commands.create(command);
-      if (guilds.toArray().length < 10) {
-        setTimeout(() => { }, 1000);
-      }
-    }
-    return true;
-  }
-
-  public static async registerFromNameAndGuildID(
-    name: string,
-    guildID: string,
-  ): Promise<boolean> {
-    if (
-      (await this.client!.application?.commands.fetch())?.find(
-        (c) => c.name === name,
-      )
-    ) {
-      Logger.warn(
-        `⚠ Command with name ${name} already exists in GuildID ${guildID}.`,
-      );
-      return false;
-    }
-    const command = this.buildCommandFromName(name)?.toJSON();
-    if (!command) {
-      Logger.warn(`⚠ Command with name ${name} is invalid.`);
-      return false;
-    }
-    const guild = this.client!.guilds.cache.get(guildID);
-    if (!guild) {
-      Logger.warn(`⚠ Guild with ID ${guildID} not found.`);
-      return false;
-    }
-
-    await guild.commands.create(command);
     return true;
   }
 
@@ -514,13 +360,17 @@ export class Command extends command {
 
     const guilds = this.client!.guilds.cache.values();
     for (const guild of guilds) {
-      await this.registerWithGuildID(guild.id, commands);
+      await this.registerWithGuildID(guild.id, commands.guild);
       if (guilds.toArray().length < 10) {
         setTimeout(() => { }, 1000);
       }
     }
 
-    Logger.info(`✅️ Registered ${commands.length} commands successfully.`);
+    if (commands.global.length > 0) {
+      await this.client?.application?.commands.set(commands.global);
+    }
+
+    Logger.info(`✅️ Registered ${commands.guild.length} guild commands and ${commands.global.length} global command successfully.`);
     return true;
   }
 

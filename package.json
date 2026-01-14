@@ -41,7 +41,6 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
-    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^25.0.3",
     "discord.js": "^14.25.1",
     "eslint": "^9.39.2",
@@ -55,12 +54,7 @@
   "packageManager": "pnpm@10.27.0",
   "dependencies": {
     "@logtape/file": "^1.3.6",
-    "@logtape/logtape": "^1.3.6",
-    "@types/pg": "^8.16.0",
-    "better-sqlite3": "^12.5.0",
-    "mysql2": "^3.16.0",
-    "pg": "^8.16.3",
-    "winston": "^3.19.0"
+    "@logtape/logtape": "^1.3.6"
   },
   "peerDependencies": {
     "discord.js": "^14.25.1"

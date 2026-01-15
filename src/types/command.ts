@@ -6,6 +6,7 @@ import type {
     ButtonInteraction,
     StringSelectMenuInteraction,
     UserContextMenuCommandInteraction,
+    Interaction
 } from "discord.js";
 
 type InteractionKind = "slash" | "userContextMenu" | "messageContextMenu" | "button" | "selectMenu" | "modal";
@@ -26,22 +27,25 @@ export interface OptionT {
 }
 
 export abstract class BaseInteraction<T extends InteractionKind> {
-    readonly type: T;
-
-    public abstract global: boolean;
-    public abstract isAdminOnly?: boolean;
-    public abstract isDevOnly?: boolean;
-    public abstract isCooldownEnabled?: boolean;
-    public abstract globalCooldownTime?: number;
-    public abstract userCooldownTime?: number;
-
     protected constructor(type: T) {
         this.type = type;
     }
 
+    readonly type: T;
+
+    public abstract name: string;
     public description?: string;
+    public global: boolean = false;
     public parent?: string;
     public option?: OptionT[];
+
+    public abstract execute(interaction: Interaction): Promise<void>;
+
+    public isAdminOnly: boolean = false;
+    public isDevOnly: boolean = false;
+    public isCooldownEnabled: boolean = false;
+    public globalCooldownTime?: number;
+    public userCooldownTime?: number;
 
     public hasParent(): this is this & { parent: string } {
         return typeof this.parent === "string";
@@ -88,16 +92,12 @@ export abstract class BaseCommand<T extends "slash" | "userContextMenu" | "messa
     constructor(type: T) {
         super(type);
     }
-
-    public abstract name: string;
 }
 
 export abstract class BaseAction<T extends "button" | "selectMenu" | "modal"> extends BaseInteraction<T> {
     constructor(type: T) {
         super(type);
     }
-
-    public abstract name: string;
 }
 
 export abstract class ButtonActionT extends BaseAction<"button"> {
@@ -129,10 +129,9 @@ export abstract class SlashCommandT extends BaseCommand<"slash"> {
         super("slash");
     }
 
-    public abstract name: string;
     public abstract description: string;
 
-    public abstract autocomplete?(interaction: AutocompleteInteraction): Promise<void>;
+    public async autocomplete?(_interaction: AutocompleteInteraction): Promise<void> { };
     public abstract execute(interaction: ChatInputCommandInteraction): Promise<void>;
 }
 
@@ -141,8 +140,6 @@ export abstract class UserContextCommandT extends BaseCommand<"userContextMenu">
         super("userContextMenu");
     }
 
-    public abstract name: string
-
     public abstract execute(interaction: UserContextMenuCommandInteraction): Promise<void>;
 }
 
@@ -150,8 +147,6 @@ export abstract class MessageContextCommandT extends BaseCommand<"messageContext
     constructor() {
         super("messageContextMenu");
     }
-
-    public abstract name: string
 
     public abstract execute(interaction: MessageContextMenuCommandInteraction): Promise<void>;
 }

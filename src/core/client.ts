@@ -4,7 +4,7 @@ import { getCustomCoreLogger, Log } from "./logger.js";
 import { ErrorHandler } from "./error.js";
 import { Command } from "./command.js";
 import { Event } from "./event.js";
-import { Core as core } from "#types";
+import { Core as core } from "../types/index.js";
 
 class DiskernelError extends Error {
   constructor(message: string, options?: ErrorOptions) {

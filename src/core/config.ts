@@ -1,5 +1,5 @@
 import { GatewayIntentBits } from "discord.js";
-import { type ConfigT, type Intent, Config as config } from "#types";
+import { type ConfigT, type Intent, Config as config } from "../types/index.js";
 import { Log } from "./logger.js";
 
 class EnvConfigError extends Error {

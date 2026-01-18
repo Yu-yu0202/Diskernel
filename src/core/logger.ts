@@ -8,7 +8,7 @@ import {
   type Logger as LoggerT,
 } from "@logtape/logtape";
 import { getRotatingFileSink } from "@logtape/file";
-import { Config, Log as log, type Logging } from "#types";
+import { Config, Log as log, type Logging } from "../types/index.js";
 
 export class Log extends log {
   private static isInitalized: boolean = false;

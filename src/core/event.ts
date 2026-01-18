@@ -2,7 +2,7 @@ import path from "path";
 import fs from "fs";
 import type { Client, ClientEvents } from "discord.js";
 import { getCustomCoreLogger } from "./logger.js";
-import { Event as event, type EventT } from "#types";
+import { Event as event, type EventT } from "../types/index.js";
 
 type InferEventName<T> = T extends EventT<infer K> ? K : never;
 type EventArgs<T> = ClientEvents[InferEventName<T>];

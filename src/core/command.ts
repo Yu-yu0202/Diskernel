@@ -28,7 +28,7 @@ import {
   Command as command,
   BaseAction,
   BaseCommand
-} from "#types";
+} from "../types/index.js";
 
 const Logger = getCustomCoreLogger("commands");
 

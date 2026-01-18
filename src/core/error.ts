@@ -1,6 +1,6 @@
 import { Core } from "./client.js";
 import { getCustomCoreLogger } from "./logger.js";
-import { ErrorHandler as errorhandler } from "#types";
+import { ErrorHandler as errorhandler } from "../types/index.js";
 
 const Logger = getCustomCoreLogger("errorHandler");
 

@@ -35,6 +35,15 @@ export default [
           caughtErrorsIgnorePattern: "^_",
         },
       ],
+      "@typescript-eslint/no-shadow": [
+        "error",
+        {
+          ignoreTypeValueShadow: true,
+          ignoreFunctionTypeParameterNameValueShadow: true,
+          hoist: "functions",
+        },
+      ],
+      "no-shadow": "off",
       "@typescript-eslint/no-explicit-any": "off",
       "no-async-promise-executor": "off",
       "no-undef": "off",

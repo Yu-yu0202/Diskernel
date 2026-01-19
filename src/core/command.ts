@@ -27,7 +27,7 @@ import {
   SlashCommandT,
   Command as command,
   BaseAction,
-  BaseCommand
+  BaseCommand,
 } from "../types/index.js";
 
 const Logger = getCustomCoreLogger("commands");
@@ -35,7 +35,10 @@ const Logger = getCustomCoreLogger("commands");
 export class Command extends command {
   private static client?: Client;
   private static commands: AnyCommandT[] = [];
-  private static actions: Map<string, AnyActionT> = new Map<string, AnyActionT>();
+  private static actions: Map<string, AnyActionT> = new Map<
+    string,
+    AnyActionT
+  >();
   private static subCommands: {
     parent: string;
     command: SlashCommandSubcommandBuilder;
@@ -64,7 +67,9 @@ export class Command extends command {
         this.handleCommands(interaction);
     });
     this.client?.on("guildCreate", async (guild) => {
-      Logger.info(`✅ Joined new guild(id: ${guild.id}, name: ${guild.name}). registering commands...`);
+      Logger.info(
+        `✅ Joined new guild(id: ${guild.id}, name: ${guild.name}). registering commands...`,
+      );
       const commands = (() => {
         try {
           return this.buildCommands();
@@ -75,7 +80,7 @@ export class Command extends command {
         }
       })();
       if (commands) await this.registerWithGuildID(guild.id, commands.guild);
-      Logger.info('✅ Register commands finished successfully.');
+      Logger.info("✅ Register commands finished successfully.");
     });
   }
 
@@ -94,10 +99,14 @@ export class Command extends command {
 
               if (typeof commandClass === "function") {
                 try {
-                  const instance = new (commandClass as new () => AnyCommandT | AnyActionT)();
+                  const instance = new (commandClass as new () =>
+                    | AnyCommandT
+                    | AnyActionT)();
                   command = instance;
                 } catch (_e) {
-                  Logger.warn(`❌️ Failed to instantiate command class: ${file}`);
+                  Logger.warn(
+                    `❌️ Failed to instantiate command class: ${file}`,
+                  );
                   return;
                 }
               } else {
@@ -187,50 +196,49 @@ export class Command extends command {
   ) {
     switch (option.type) {
       case "string":
-        command.addStringOption((option) =>
-          option
+        command.addStringOption((optionBuilder) =>
+          optionBuilder
             .setName(option.name)
             .setDescription(option.description)
             .setRequired(option.required)
-            .addChoices(option.choices ?? []),
+            .addChoices(...(option.choices ?? [])),
         );
         break;
       case "integer":
-        command.addIntegerOption((option) =>
-          option
+        command.addIntegerOption((optionBuilder) =>
+          optionBuilder
             .setName(option.name)
             .setDescription(option.description)
             .setRequired(option.required)
-            .addChoices(option.choices ?? []),
         );
         break;
       case "boolean":
-        command.addBooleanOption((option) =>
-          option
+        command.addBooleanOption((optionBuilder) =>
+          optionBuilder
             .setName(option.name)
             .setDescription(option.description)
             .setRequired(option.required),
         );
         break;
       case "channel":
-        command.addChannelOption((option) =>
-          option
+        command.addChannelOption((optionBuilder) =>
+          optionBuilder
             .setName(option.name)
             .setDescription(option.description)
             .setRequired(option.required),
         );
         break;
       case "role":
-        command.addRoleOption((option) =>
-          option
+        command.addRoleOption((optionBuilder) =>
+          optionBuilder
             .setName(option.name)
             .setDescription(option.description)
             .setRequired(option.required),
         );
         break;
       case "user":
-        command.addUserOption((option) =>
-          option
+        command.addUserOption((optionBuilder) =>
+          optionBuilder
             .setName(option.name)
             .setDescription(option.description)
             .setRequired(option.required),
@@ -253,12 +261,16 @@ export class Command extends command {
     return undefined;
   }
 
-  private static buildCommands(): { guild: ApplicationCommandDataResolvable[], global: ApplicationCommandDataResolvable[] } {
+  private static buildCommands(): {
+    guild: ApplicationCommandDataResolvable[];
+    global: ApplicationCommandDataResolvable[];
+  } {
     type _commands = SlashCommandBuilder | ContextMenuCommandBuilder;
     const commands: _commands[] = [];
     const globalCommands: _commands[] = [];
 
     for (const command of this.commands) {
+      Logger.debug("Building command: {name}", { name: command.name });
       if (command.type === "slash" && !command.parent) {
         const slashCommand = new SlashCommandBuilder()
           .setName(command.name)
@@ -282,8 +294,15 @@ export class Command extends command {
             this.buildCommandOptions(option, subCommand);
           }
         }
-        this.subCommands.push({ parent: command.parent, command: subCommand, isGlobal: command.global });
-      } else if (command.type === "userContextMenu" || command.type === "messageContextMenu") {
+        this.subCommands.push({
+          parent: command.parent,
+          command: subCommand,
+          isGlobal: command.global,
+        });
+      } else if (
+        command.type === "userContextMenu" ||
+        command.type === "messageContextMenu"
+      ) {
         const contextMenuCommand = new ContextMenuCommandBuilder()
           .setName(command.name)
           .setType(
@@ -306,14 +325,17 @@ export class Command extends command {
       }
     }
     this.subCommands.forEach((v) => {
-      const slashCommand = commands.find((c) => c.name === v.parent) ?? globalCommands.find(c => c.name === v.parent) ?? undefined;
+      const slashCommand =
+        commands.find((c) => c.name === v.parent) ??
+        globalCommands.find((c) => c.name === v.parent) ??
+        undefined;
       if (slashCommand instanceof SlashCommandBuilder) {
         slashCommand.addSubcommand(v.command);
       }
     });
     return {
       guild: commands.map((c) => c.toJSON()),
-      global: globalCommands.map(c => c.toJSON())
+      global: globalCommands.map((c) => c.toJSON()),
     };
   }
 
@@ -340,9 +362,13 @@ export class Command extends command {
 
   private static async registerCommands(): Promise<boolean> {
     if (
-      !(await this.loadCommandFromDir(path.resolve(process.cwd(), "dist", "commands")))
+      !(await this.loadCommandFromDir(
+        path.resolve(process.cwd(), "dist", "commands"),
+      ))
     ) {
-      Logger.warn(`❌️ Failed to load commands from ${process.cwd()}/dist/commands`);
+      Logger.warn(
+        `❌️ Failed to load commands from ${process.cwd()}/dist/commands`,
+      );
       return false;
     }
     Logger.info(`✅️ Loaded ${this.commands.length} commands.`);
@@ -370,7 +396,9 @@ export class Command extends command {
       await this.client?.application?.commands.set(commands.global);
     }
 
-    Logger.info(`✅️ Registered ${commands.guild.length} guild commands and ${commands.global.length} global command successfully.`);
+    Logger.info(
+      `✅️ Registered ${commands.guild.length} guild commands and ${commands.global.length} global command successfully.`,
+    );
     return true;
   }
 
@@ -416,15 +444,16 @@ export class Command extends command {
       | StringSelectMenuInteraction
       | ModalSubmitInteraction,
   ): boolean {
-    const interactionName = interaction instanceof ButtonInteraction ||
-      interaction instanceof StringSelectMenuInteraction ||
-      interaction instanceof ModalSubmitInteraction
-      ? interaction.customId
-      : interaction.commandName;
+    const interactionName =
+      interaction instanceof ButtonInteraction ||
+        interaction instanceof StringSelectMenuInteraction ||
+        interaction instanceof ModalSubmitInteraction
+        ? interaction.customId
+        : interaction.commandName;
 
-    const command = this.commands.find(
-      (c) => c.name === interactionName,
-    ) || this.actions.get(interactionName);
+    const command =
+      this.commands.find((c) => c.name === interactionName) ||
+      this.actions.get(interactionName);
     if (!command) return false;
 
     if (!command.isAdminOnly) return true;
@@ -444,15 +473,16 @@ export class Command extends command {
       | StringSelectMenuInteraction
       | ModalSubmitInteraction,
   ): boolean {
-    const interactionName = interaction instanceof ButtonInteraction ||
-      interaction instanceof StringSelectMenuInteraction ||
-      interaction instanceof ModalSubmitInteraction
-      ? interaction.customId
-      : interaction.commandName;
+    const interactionName =
+      interaction instanceof ButtonInteraction ||
+        interaction instanceof StringSelectMenuInteraction ||
+        interaction instanceof ModalSubmitInteraction
+        ? interaction.customId
+        : interaction.commandName;
 
-    const command = this.commands.find(
-      (c) => c.name === interactionName,
-    ) || this.actions.get(interactionName);
+    const command =
+      this.commands.find((c) => c.name === interactionName) ||
+      this.actions.get(interactionName);
     if (!command) return false;
 
     if (!command.isDevOnly) return true;
@@ -472,11 +502,12 @@ export class Command extends command {
       | StringSelectMenuInteraction
       | ModalSubmitInteraction,
   ): Promise<void> {
-    const interactionName = interaction instanceof ButtonInteraction ||
-      interaction instanceof StringSelectMenuInteraction ||
-      interaction instanceof ModalSubmitInteraction
-      ? interaction.customId
-      : interaction.commandName;
+    const interactionName =
+      interaction instanceof ButtonInteraction ||
+        interaction instanceof StringSelectMenuInteraction ||
+        interaction instanceof ModalSubmitInteraction
+        ? interaction.customId
+        : interaction.commandName;
 
     const embed = new EmbedBuilder()
       .setTitle("⏳️ レート制限")
@@ -500,11 +531,12 @@ export class Command extends command {
       | StringSelectMenuInteraction
       | ModalSubmitInteraction,
   ): Promise<void> {
-    const interactionName = interaction instanceof ButtonInteraction ||
-      interaction instanceof StringSelectMenuInteraction ||
-      interaction instanceof ModalSubmitInteraction
-      ? interaction.customId
-      : interaction.commandName;
+    const interactionName =
+      interaction instanceof ButtonInteraction ||
+        interaction instanceof StringSelectMenuInteraction ||
+        interaction instanceof ModalSubmitInteraction
+        ? interaction.customId
+        : interaction.commandName;
 
     const embed = new EmbedBuilder()
       .setTitle("❌️ 管理者権限が必要です")
@@ -526,11 +558,12 @@ export class Command extends command {
       | StringSelectMenuInteraction
       | ModalSubmitInteraction,
   ): Promise<void> {
-    const interactionName = interaction instanceof ButtonInteraction ||
-      interaction instanceof StringSelectMenuInteraction ||
-      interaction instanceof ModalSubmitInteraction
-      ? interaction.customId
-      : interaction.commandName;
+    const interactionName =
+      interaction instanceof ButtonInteraction ||
+        interaction instanceof StringSelectMenuInteraction ||
+        interaction instanceof ModalSubmitInteraction
+        ? interaction.customId
+        : interaction.commandName;
 
     const embed = new EmbedBuilder()
       .setTitle("❌️ 管理者権限が必要です")
@@ -555,22 +588,22 @@ export class Command extends command {
       | ModalSubmitInteraction
       | AutocompleteInteraction,
   ): Promise<void> {
-    const interactionName = interaction instanceof ButtonInteraction ||
-      interaction instanceof StringSelectMenuInteraction ||
-      interaction instanceof ModalSubmitInteraction
-      ? interaction.customId
-      : interaction.commandName;
+    const interactionName =
+      interaction instanceof ButtonInteraction ||
+        interaction instanceof StringSelectMenuInteraction ||
+        interaction instanceof ModalSubmitInteraction
+        ? interaction.customId
+        : interaction.commandName;
 
     Logger.debug(
       `Triggered command-interaction: ${interactionName} for ${interaction.user.id}(${interaction.user.globalName})`,
     );
-    const command = this.commands.find(
-      (c) => c.name === interactionName,
-    ) || this.actions.get(interactionName) || undefined;
+    const command =
+      this.commands.find((c) => c.name === interactionName) ||
+      this.actions.get(interactionName) ||
+      undefined;
     if (!command) {
-      Logger.debug(
-        `❌️ Command with name ${interactionName} not found.`,
-      );
+      Logger.debug(`❌️ Command with name ${interactionName} not found.`);
       return;
     }
 
@@ -584,9 +617,18 @@ export class Command extends command {
       return;
     }
 
-    const subCommandName = command.type === "slash" && interaction instanceof ChatInputCommandInteraction ? interaction.options.getSubcommand(false) : null;
+    const subCommandName =
+      command.type === "slash" &&
+        interaction instanceof ChatInputCommandInteraction
+        ? interaction.options.getSubcommand(false)
+        : null;
 
-    const isCommandTypeMatch = command.isSlashCommand() || command.isContextMenuCommand() || command.isButtonAction() || command.isSelectMenuAction() || command.isModalAction();
+    const isCommandTypeMatch =
+      command.isSlashCommand() ||
+      command.isContextMenuCommand() ||
+      command.isButtonAction() ||
+      command.isSelectMenuAction() ||
+      command.isModalAction();
 
     if (!isCommandTypeMatch) {
       Logger.debug(
@@ -611,7 +653,12 @@ export class Command extends command {
       return;
     }
 
-    if (!this.isCooldownPassed(subCommandName || command.name, interaction.user.id)) {
+    if (
+      !this.isCooldownPassed(
+        subCommandName || command.name,
+        interaction.user.id,
+      )
+    ) {
       Logger.debug(
         `❌️ Command ${subCommandName || interactionName} is on cooldown for ${interaction.user.id}(${interaction.user.globalName})`,
       );
@@ -623,9 +670,7 @@ export class Command extends command {
       `✅️ Triggered command ${subCommandName || interactionName} for ${interaction.user.id}(${interaction.user.globalName})`,
     );
 
-    if (
-      command.isSlashCommand() && interaction.isChatInputCommand()
-    ) {
+    if (command.isSlashCommand() && interaction.isChatInputCommand()) {
       if (subCommandName) {
         const subCommand = this.commands.find(
           (c) => c.name === subCommandName && c.parent === command.name,
@@ -647,17 +692,14 @@ export class Command extends command {
       interaction.isMessageContextMenuCommand()
     ) {
       await command.execute(interaction);
-    } else if (
-      command.isButtonAction() && interaction.isButton()
-    ) {
+    } else if (command.isButtonAction() && interaction.isButton()) {
       await command.execute(interaction);
     } else if (
-      command.isSelectMenuAction() && interaction.isStringSelectMenu()
+      command.isSelectMenuAction() &&
+      interaction.isStringSelectMenu()
     ) {
       await command.execute(interaction);
-    } else if (
-      command.isModalAction() && interaction.isModalSubmit()
-    ) {
+    } else if (command.isModalAction() && interaction.isModalSubmit()) {
       await command.execute(interaction);
     }
   }

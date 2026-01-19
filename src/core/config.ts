@@ -41,14 +41,9 @@ export class Config extends config {
 
       if (config.options.logging) {
         if (
-          ![
-            "trace",
-            "debug",
-            "info",
-            "warning",
-            "error",
-            "fatal",
-          ].includes(config.options.logging.level)
+          !["trace", "debug", "info", "warning", "error", "fatal"].includes(
+            config.options.logging.level,
+          )
         ) {
           throw new EnvConfigError(
             "Logging level must be one of 'trace', 'debug', 'info', 'warning', 'error', 'fatal'.",
@@ -99,9 +94,7 @@ export class Config extends config {
 
   public static get<K extends keyof ConfigT>(key: K): ConfigT[K] {
     if (!Config.instance) {
-      throw new EnvConfigError(
-        "Config is not initialized!",
-      );
+      throw new EnvConfigError("Config is not initialized!");
     }
     return Config.instance[key];
   }

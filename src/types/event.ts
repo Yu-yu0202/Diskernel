@@ -6,4 +6,3 @@ export interface EventT<K extends keyof ClientEvents = keyof ClientEvents> {
 
   execute: (...args: ClientEvents[K]) => Promise<void> | void;
 }
-

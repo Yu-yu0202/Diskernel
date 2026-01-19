@@ -55,12 +55,12 @@ export class Core extends core {
     Logger.trace(
       `Using token: ${Config.get("TOKEN").replace(/.(?=.{4})/g, "*")}`,
     );
-    await this.client!
-      .login(Config.get("TOKEN"))
-      .catch(<T extends Error>(e: T) => {
+    await this.client!.login(Config.get("TOKEN")).catch(
+      <T extends Error>(e: T) => {
         Logger.error("❌ Failed to login to Discord.");
         ErrorHandler.fatal("Failed to login to Discord", e);
-      });
+      },
+    );
 
     this.client!.once("clientReady", () => {
       Logger.info(`✅ Logged in as ${Core.client!.user?.tag}`);
@@ -72,7 +72,9 @@ export class Core extends core {
 
     Logger.info("▶ Initializing events...");
     if (!this.client) {
-      throw new DiskernelError("Discord client is not initialized before events.");
+      throw new DiskernelError(
+        "Discord client is not initialized before events.",
+      );
     }
     await Event.initalize(this.client);
     Logger.info("✅ Events initialized successfully.");

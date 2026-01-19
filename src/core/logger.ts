@@ -12,7 +12,9 @@ import { Config, Log as log, type Logging } from "../types/index.js";
 
 export class Log extends log {
   private static isInitalized: boolean = false;
-  public static readonly LOGGER_READY: symbol = Symbol.for("diskernel.logger.ready");
+  public static readonly LOGGER_READY: symbol = Symbol.for(
+    "diskernel.logger.ready",
+  );
   private static _ready?: Promise<void>;
 
   private static createLogDirIfNotExists(dir: string): void {
@@ -21,7 +23,6 @@ export class Log extends log {
       fs.mkdirSync(dir, { recursive: true });
     }
   }
-
 
   public static async initalizeMainLogger(options?: Logging): Promise<void> {
     if (this._ready) {
@@ -35,7 +36,7 @@ export class Log extends log {
       if (!options) {
         options = Config.get("options")?.logging ?? {
           level: "info",
-          enableFileLogging: false
+          enableFileLogging: false,
         };
       }
       if (options.enableFileLogging) {
@@ -51,14 +52,14 @@ export class Log extends log {
           }),
           ...(options.enableFileLogging
             ? {
-              file: getRotatingFileSink(options.logFilePath, {
-                maxSize: 4 * 1024 * 1024,
-                maxFiles: 4,
-                nonBlocking: true,
-                bufferSize: 512 * 1024,
-                flushInterval: 100
-              }),
-            }
+                file: getRotatingFileSink(options.logFilePath, {
+                  maxSize: 4 * 1024 * 1024,
+                  maxFiles: 4,
+                  nonBlocking: true,
+                  bufferSize: 512 * 1024,
+                  flushInterval: 100,
+                }),
+              }
             : {}),
         },
         filters: {},
@@ -71,18 +72,12 @@ export class Log extends log {
           {
             category: "[diskernel]",
             lowestLevel: options.level ?? "info",
-            sinks: [
-              "console",
-              ...(options.enableFileLogging ? ["file"] : []),
-            ],
+            sinks: ["console", ...(options.enableFileLogging ? ["file"] : [])],
           },
           {
             category: "main",
             lowestLevel: options.level ?? "info",
-            sinks: [
-              "console",
-              ...(options.enableFileLogging ? ["file"] : []),
-            ],
+            sinks: ["console", ...(options.enableFileLogging ? ["file"] : [])],
           },
         ],
       });
@@ -95,7 +90,6 @@ export class Log extends log {
   public static get get(): ReturnType<typeof getLogger> {
     return getLogger("main");
   }
-
 
   public static setReady(promise: Promise<void>): void {
     this._ready = promise;
@@ -110,10 +104,18 @@ export class Log extends log {
   }
 }
 
-export const Logger: (cat?: string | string[]) => LoggerT = (cat?: string | string[]) => {
-  return getLogger(["main", ...(cat instanceof Array ? cat : cat ? [cat] : [])]);
+export const Logger: (cat?: string | string[]) => LoggerT = (
+  cat?: string | string[],
+) => {
+  return getLogger([
+    "main",
+    ...(cat instanceof Array ? cat : cat ? [cat] : []),
+  ]);
 };
 export const CoreLogger: LoggerT = getLogger("[diskernel]");
 export function getCustomCoreLogger(category: string | string[]) {
-  return getLogger(["[diskernel]", ...(category instanceof Array ? category : [category])]);
+  return getLogger([
+    "[diskernel]",
+    ...(category instanceof Array ? category : [category]),
+  ]);
 }

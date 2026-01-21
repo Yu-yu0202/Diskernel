@@ -57,7 +57,14 @@ export class Command extends command {
 
     this.client = Core.Client;
 
-    await this.registerCommands();
+    if (this.client?.isReady()) {
+      await this.registerCommands();
+    } else {
+      this.client?.once("ready", async () => {
+        await this.registerCommands();
+      });
+    }
+
     this.client?.on("interactionCreate", (interaction) => {
       if (
         interaction.isChatInputCommand() ||
@@ -384,11 +391,14 @@ export class Command extends command {
     })();
     if (!commands) return false;
 
-    const guilds = this.client!.guilds.cache.values();
+    const guilds = Array.from(this.client!.guilds.cache.values());
+
+    Logger.debug(`Current guild cache size: ${this.client!.guilds.cache.size}`);
+
     for (const guild of guilds) {
       await this.registerWithGuildID(guild.id, commands.guild);
-      if (guilds.toArray().length < 10) {
-        setTimeout(() => { }, 1000);
+      if (guilds.length > 10) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
       }
     }
 

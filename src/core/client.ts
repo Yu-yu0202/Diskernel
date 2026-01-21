@@ -62,22 +62,20 @@ export class Core extends core {
       },
     );
 
-    this.client!.once("clientReady", () => {
+    this.client!.once("clientReady", async () => {
       Logger.info(`✅ Logged in as ${Core.client!.user?.tag}`);
+      Logger.info("▶ Initializing commands...");
+      await Command.initialize();
+      Logger.info("✅ Commands initialized successfully.");
+      Logger.info("▶ Initializing events...");
+      if (!this.client) {
+        throw new DiskernelError(
+          "Discord client is not initialized before events.",
+        );
+      }
+      await Event.initalize(this.client);
+      Logger.info("✅ Events initialized successfully.");
     });
-
-    Logger.info("▶ Initializing commands...");
-    await Command.initialize();
-    Logger.info("✅ Commands initialized successfully.");
-
-    Logger.info("▶ Initializing events...");
-    if (!this.client) {
-      throw new DiskernelError(
-        "Discord client is not initialized before events.",
-      );
-    }
-    await Event.initalize(this.client);
-    Logger.info("✅ Events initialized successfully.");
   }
 
   public static stop(): void {

@@ -34,7 +34,7 @@ export class Core extends core {
     const intents = Config.get("intents");
     Logger.debug(`Loaded ${intents.length} intents from configuration.`);
 
-    Core.client ??= new Client({ intents: intents });
+    Core.client = new Client({ intents: intents });
     Logger.info("✅ Initialized Discord client.");
 
     this.client!.on("debug", (m) => {
